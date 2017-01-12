@@ -3,7 +3,7 @@
 from ucsmsdk.ucsconstants import NamingId
 from ucsmsdk.mometa.vnic.VnicFc import VnicFc
 from ucsmsdk.mometa.vnic.VnicSanConnPolicy import VnicSanConnPolicy
-
+from ucsmsdk.mometa.vnic.VnicFcNode import VnicFcNode
 
 DOCUMENTATION = '''
 ---
@@ -39,6 +39,7 @@ options:
         - "organizational object name to create the policy under"
         required: true
         default: None
+    wwnn_pool: "world wide node name pool"
     hbas:
       description:
          - "a list of vnic dictionaries examples as below
@@ -53,7 +54,7 @@ options:
 
 EXAMPLES = '''
 # Create a san conn policy exchange server on dev ucs
-- ucs_san_con:
+- ucs_san_conn:
     state: present
     hostname: dev_ucsm_hostname
     username: admin
@@ -61,7 +62,8 @@ EXAMPLES = '''
     port: 443
     org_name: myorgname
     san_con_name: exchange
-    san_con_descr: exchange server lan con policy
+    san_con_descr: exchange server san con policy
+    wwnn_pool: exchange_fc_pool
     hbas:
       - name: hba1
         order: 1
@@ -98,11 +100,13 @@ def san_con_present(handle, params):
 
     if org_obj:
         san_con_pol = VnicSanConnPolicy(parent_mo_or_dn=org_obj,
-                                        name=params['san_con__name'],
+                                        name=params['san_con_name'],
                                         descr=params['san_con_descr'])
 
+        fc_node = VnicFcNode(parent_mo_or_dn=san_con_pol,
+                             ident_pool_name=params['wwnn_pool'])
         for hba in params['hbas']:
-            hba_obj = VnicFC(parent_mo_or_dn=vnic_pol,
+            hba_obj = VnicFc(parent_mo_or_dn=san_con_pol,
                              name=hba['name'],
                              order=str(hba['order']),
                              nw_templ_name=hba['templ'],
@@ -145,7 +149,7 @@ def san_con_absent(handle, params):
 def main():
     """main entry point"""
 
-    fields = dict(
+    spec = get_ucs_argument_spec(**dict(
         org_name=dict(
             required=True,
             type="str"
@@ -158,6 +162,10 @@ def main():
             required=False,
             type="str"
         ),
+        wwnn_pool=dict(
+            required=True,
+            type="str"
+        ),
         hbas=dict(
             type="list"
         ),
@@ -166,10 +174,9 @@ def main():
             choices=["present", "absent"],
             type="str"
         ),
-    )
+    ))
 
 
-    spec = get_ucs_argument_spec(fields)
     module = AnsibleModule(argument_spec=spec)
 
     handle = get_handle(module)

@@ -52,12 +52,13 @@ options:
 
 EXAMPLES = '''
 # Create lan conn policy exchange server on dev ucs
-- ucs_san_con:
+- ucs_lan_con:
     state: present
     hostname: dev_ucsm_hostname
     username: admin
     password: admin
     port: 443
+    secure: true
     org_name: myorgname
     lan_con_name: exchange
     lan_con_descr: exchange server lan con policy
@@ -98,8 +99,8 @@ def vcon_present(handle, params):
     if org_obj:
 
         vnic_pol = VnicLanConnPolicy(parent_mo_or_dn=org_obj,
-                                     name=params['vcon_name'],
-                                     descr=params['vcon_descr'])
+                                     name=params['lan_con_name'],
+                                     descr=params['lan_con_descr'])
 
         for vnic in params['vnics']:
             vnic = VnicEther(parent_mo_or_dn=vnic_pol,
@@ -111,7 +112,7 @@ def vcon_present(handle, params):
         handle.add_mo(vnic_pol, True)
         handle.commit()
 
-        if get_vcon(handle, org_obj, params['vcon_name']):
+        if get_vcon(handle, org_obj, params['lan_con_name']):
             #return ({'changed': True, 'failed': False})
             return True
     else:
@@ -125,18 +126,18 @@ def vcon_absent(handle, params):
     org_obj = get_org(handle, params['org_name'])
 
     if org_obj:
-        filter_str = '(name, "{0}", type="eq")'.format(params['vcon_name'])
+        filter_str = '(name, "{0}", type="eq")'.format(params['lan_con_name'])
         vcon_list = handle.query_children(in_mo=org_obj,
                                           class_id=NamingId.VNIC_LAN_CONN_POLICY,
                                           filter_str=filter_str,
                                           hierarchy=False)
         for vcon in vcon_list:
-            if vcon.name == params['vcon_name']:
+            if vcon.name == params['lan_con_name']:
                 handle.remove_mo(vcon)
                 handle.commit()
                 break
 
-    if get_vcon(handle, org_obj, params['vcon_name']):
+    if get_vcon(handle, org_obj, params['lan_con_name']):
         #return ({'changed': True, 'failed': False})
         return True
     else:
@@ -147,16 +148,16 @@ def vcon_absent(handle, params):
 def main():
     """main entry point"""
 
-    fields = dict(
+    spec = get_ucs_argument_spec(**dict(
         org_name=dict(
             required=True,
             type="str"
         ),
-        vcon_name=dict(
+        lan_con_name=dict(
             required=True,
             type="str"
         ),
-        vcon_descr=dict(
+        lan_con_descr=dict(
             required=False,
             type="str"
         ),
@@ -168,10 +169,9 @@ def main():
             choices=["present", "absent"],
             type="str"
         ),
-    )
+    ))
 
 
-    spec = get_ucs_argument_spec(fields)
     module = AnsibleModule(argument_spec=spec)
 
     handle = get_handle(module)
